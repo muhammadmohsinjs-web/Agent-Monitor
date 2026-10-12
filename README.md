@@ -12,6 +12,14 @@ No account, no cloud, no dependencies. It is one Python file that serves one HTM
 
 ![status](https://img.shields.io/badge/python-3.7%2B-blue) ![deps](https://img.shields.io/badge/dependencies-none-green) ![license](https://img.shields.io/badge/license-MIT-lightgrey)
 
+![Agent Monitor following a live Claude Code session](docs/dashboard.png)
+
+*Following a live session: the current prompt, cost, context window and tokens at a glance.*
+
+![A session where the main agent delegates to three subagents](docs/swarm.png)
+
+*A finished session where the main agent delegated to three custom subagents: the delegation timeline, event stream, context chart and inspector.*
+
 ## Quick start
 
 ```bash
