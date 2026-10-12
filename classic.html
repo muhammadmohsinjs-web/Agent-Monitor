@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Viewer</title>
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f4f4f2; --surface-1: #fcfcfb; --border: #e3e2de; --grid: #ecebe7;
+  --text-primary: #0b0b0b; --text-secondary: #52514e; --text-muted: #8a8984;
+  --main: #52514e; --accent: #2a78d6;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+  --s5: #e87ba4; --s6: #008300; --s7: #6250d6; --s8: #e34948;
+  --good: #1baf7a; --warn: #eda100; --bad: #e34948;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #111110; --surface-1: #1a1a19; --border: #2e2e2c; --grid: #262624;
+    --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #8a8984;
+    --main: #c3c2b7; --accent: #3987e5;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+    --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+    --good: #199e70; --warn: #c98500; --bad: #e66767;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #111110; --surface-1: #1a1a19; --border: #2e2e2c; --grid: #262624;
+  --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #8a8984;
+  --main: #c3c2b7; --accent: #3987e5;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+  --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+  --good: #199e70; --warn: #c98500; --bad: #e66767;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text-primary);
+  font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; }
+header { position: sticky; top: 0; z-index: 5; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+  padding: 10px 16px; background: var(--surface-1); border-bottom: 1px solid var(--border); }
+header h1 { font-size: 15px; margin: 0 8px 0 0; font-weight: 600; }
+select, button, input { font: inherit; color: var(--text-primary); background: var(--bg);
+  border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; }
+select { max-width: min(560px, 100%); }
+button { cursor: pointer; }
+button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.muted { color: var(--text-muted); }
+.sec { color: var(--text-secondary); }
+main { padding: 16px; max-width: 1400px; margin: 0 auto; display: grid; gap: 16px; }
+.card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; min-width: 0; }
+.card h2 { font-size: 13px; font-weight: 600; margin: 0 0 2px; }
+.card .sub { font-size: 12px; color: var(--text-muted); margin: 0 0 10px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.tile .label { font-size: 12px; color: var(--text-secondary); }
+.tile .value { font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.tile .note { font-size: 12px; color: var(--text-muted); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--text-secondary); margin-bottom: 8px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+.scroll { overflow-x: auto; }
+svg text { fill: var(--text-secondary); font-size: 11px; }
+svg .axis line, svg .grid { stroke: var(--grid); }
+table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+th { text-align: left; font-weight: 500; color: var(--text-secondary); font-size: 12px; padding: 6px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+td { padding: 7px 8px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+td.num, th.num { text-align: right; white-space: nowrap; }
+tr.row { cursor: pointer; }
+tr.row:hover td, tr.sel td { background: var(--bg); }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
+.badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 1px 7px; border-radius: 99px; border: 1px solid var(--border); color: var(--text-secondary); white-space: nowrap; }
+.badge.running::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--good); animation: pulse 1.2s infinite; }
+.badge.done::before { content: "✓"; color: var(--good); }
+.badge.stopped::before { content: "■"; color: var(--warn); font-size: 9px; }
+@keyframes pulse { 50% { opacity: .3; } }
+.detail { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 800px) { .detail { grid-template-columns: 1fr; } }
+pre { white-space: pre-wrap; word-break: break-word; background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+  padding: 10px; font: 12px/1.5 ui-monospace, Menlo, monospace; max-height: 360px; overflow: auto; margin: 4px 0 0; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 3px 14px; font-size: 13px; }
+.kv div:nth-child(odd) { color: var(--text-secondary); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-size: 12px; padding: 2px 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; }
+#tip { position: fixed; pointer-events: none; z-index: 10; background: var(--surface-1); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.15); max-width: 320px; display: none; }
+#tip b { font-weight: 600; }
+.empty { padding: 40px; text-align: center; color: var(--text-muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Agent Viewer</h1>
+  <select id="session" aria-label="Session"></select>
+  <button id="live" class="on" title="Re-read the transcripts every 3 seconds">● Live</button>
+  <button id="follow" class="on" title="Jump to the most recently active session">Follow latest</button>
+  <span id="updated" class="muted" style="font-size:12px"></span>
+</header>
+<main id="app"><div class="empty">Loading…</div></main>
+<div id="tip"></div>
+
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const fmtN = n => n >= 1e6 ? (n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + "M" : n >= 1e3 ? (n / 1e3).toFixed(n >= 1e4 ? 0 : 1) + "k" : String(Math.round(n || 0));
+const fmt$ = n => n == null ? "—" : n >= 100 ? "$" + n.toFixed(0) : n >= 1 ? "$" + n.toFixed(2) : "$" + n.toFixed(3);
+const fmtDur = ms => { if (ms == null || ms < 0) return "—"; const s = Math.round(ms / 1000);
+  return s < 60 ? s + "s" : s < 3600 ? Math.floor(s / 60) + "m " + (s % 60) + "s" : Math.floor(s / 3600) + "h " + Math.floor(s % 3600 / 60) + "m"; };
+const fmtTime = t => t ? new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "—";
+const ago = t => { const s = (Date.now() - t) / 1000; return s < 60 ? "just now" : s < 3600 ? Math.round(s / 60) + " min ago" : s < 86400 ? Math.round(s / 3600) + " h ago" : Math.round(s / 86400) + " d ago"; };
+const shortModel = m => (m || "").replace("claude-", "").replace(/-(\d)-(\d)/, " $1.$2").replace(/-(\d+)$/, " $1").replace(/-\d{8}$/, "");
+
+const state = { sessions: [], key: null, data: null, selected: null, live: true, follow: true };
+try { const k = localStorage.getItem("ccviz.key"); if (k) { state.key = k; state.follow = false; } } catch {}
+
+// Agent type -> categorical slot, in order of first appearance; 9th+ type folds to gray.
+let typeSlots = {};
+function typeColor(type) {
+  if (!(type in typeSlots)) typeSlots[type] = Object.keys(typeSlots).length;
+  const i = typeSlots[type];
+  return i < 8 ? `var(--s${i + 1})` : "var(--text-muted)";
+}
+
+const tip = $("#tip");
+function showTip(e, html) { tip.innerHTML = html; tip.style.display = "block"; moveTip(e); }
+function moveTip(e) { const w = tip.offsetWidth, h = tip.offsetHeight;
+  tip.style.left = Math.min(e.clientX + 14, innerWidth - w - 8) + "px";
+  tip.style.top = (e.clientY + 14 + h > innerHeight ? e.clientY - h - 10 : e.clientY + 14) + "px"; }
+function hideTip() { tip.style.display = "none"; }
+document.addEventListener("mousemove", e => { if (tip.style.display === "block") moveTip(e); });
+
+async function loadSessions() {
+  state.sessions = await (await fetch("/api/sessions")).json();
+  if (state.follow || !state.key || !state.sessions.some(s => s.key === state.key)) state.key = state.sessions[0]?.key;
+  const sel = $("#session");
+  const html = state.sessions.map(s =>
+    `<option value="${esc(s.key)}">${esc(s.title.slice(0, 70))} — ${esc(s.project.split("/").slice(-2).join("/"))} · ${s.agents} agents · ${ago(s.mtime)}</option>`).join("");
+  if (html !== sel.dataset.html && document.activeElement !== sel) { sel.innerHTML = html; sel.dataset.html = html; }
+  sel.value = state.key;
+}
+
+async function loadSession() {
+  if (!state.key) { $("#app").innerHTML = `<div class="empty">No Claude Code sessions found in ~/.claude/projects.</div>`; return; }
+  const r = await fetch("/api/session?key=" + encodeURIComponent(state.key));
+  if (!r.ok) return;
+  const d = await r.json();
+  if (state.data?.id !== d.id) { typeSlots = {}; state.selected = null; }
+  state.data = d;
+  render();
+  $("#updated").textContent = "Updated " + fmtTime(Date.now());
+}
+
+function render() {
+  const d = state.data, t = d.total, ms = d.main.summary;
+  d.agents.forEach(a => typeColor(a.type));
+  const running = d.agents.filter(a => a.status === "running").length;
+  const subCost = d.agents.reduce((s, a) => s + a.summary.cost, 0);
+  const types = Object.keys(typeSlots);
+  const sel = $("#app");
+  const sy = window.scrollY;
+  sel.innerHTML = `
+  <section class="card">
+    <h2>${esc(d.title || (d.first_prompt || "").slice(0, 140) || d.id)}</h2>
+    <p class="sub">Session ${esc(d.id)} · started ${new Date(d.start_ts).toLocaleString()} · main model ${esc(ms.models.map(shortModel).join(", ") || "—")}</p>
+    <div class="tiles">
+      ${tile("Estimated cost", fmt$(t.cost), "API list prices; not what a subscription bills")}
+      ${tile("Subagents", d.agents.length, running ? `${running} running now` : "none running")}
+      ${tile("Delegated share of cost", t.cost ? Math.round(subCost / t.cost * 100) + "%" : "—", `main ${fmt$(ms.cost)} · agents ${fmt$(subCost)}`)}
+      ${tile("Main context now", fmtN(ms.final_ctx), `peak ${fmtN(ms.peak_ctx)} tokens`)}
+      ${tile("API calls / tool calls", `${t.calls} / ${t.tool_calls}`, `main ${ms.calls} / ${ms.tool_calls}`)}
+      ${tile("Output tokens", fmtN(t.output), `${fmtN(t.cache_read)} cache reads · ${fmtN(t.cache_write)} cache writes`)}
+      ${tile("Wall time", fmtDur(d.end_ts - d.start_ts), `last activity ${fmtTime(d.end_ts)}`)}
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Delegation timeline</h2>
+    <p class="sub">Top row: each tick is one API call by the main session (height = its output tokens), diamonds are spawns. One bar per subagent, from start to its last activity; a curve links each spawn to the agent's start and a dot marks when its result reached the parent. Hover for details, click a bar to inspect.</p>
+    ${legend(types)}
+    <div class="scroll" id="gantt"></div>
+  </section>
+
+  <section class="card">
+    <h2>Context window size per API call</h2>
+    <p class="sub">Tokens sent to the model on each call (input + cache write + cache read). The main session is gray${state.selected ? "; the selected agent is overlaid in its color" : "; select an agent to overlay its own context"}. Drops in the main line are compactions.</p>
+    <div class="scroll" id="ctx"></div>
+  </section>
+
+  <section class="card">
+    <h2>Agents</h2>
+    <p class="sub">Click a row for the delegated prompt, the tools the agent used and the report it handed back.</p>
+    <div class="scroll">${agentTable(d)}</div>
+  </section>
+
+  <section class="card" id="detail">${detail(d)}</section>`;
+  drawGantt(d);
+  drawCtx(d);
+  sel.querySelectorAll("tr.row").forEach(tr => tr.onclick = () => select(tr.dataset.id));
+  window.scrollTo(0, sy);
+}
+
+const tile = (label, value, note) => `<div class="tile"><div class="label">${label}</div><div class="value">${value}</div><div class="note">${esc(note)}</div></div>`;
+const legend = types => `<div class="legend"><span><i style="background:var(--main)"></i>main session</span>${types.map(tp => `<span><i style="background:${typeColor(tp)}"></i>${esc(tp)}</span>`).join("")}</div>`;
+
+function select(id) { state.selected = state.selected === id ? null : id; render(); if (state.selected) $("#detail").scrollIntoView({ behavior: "smooth", block: "nearest" }); }
+
+function agentTable(d) {
+  if (!d.agents.length) return `<div class="empty">This session hasn't spawned any subagents yet.</div>`;
+  const byId = Object.fromEntries(d.agents.map(a => [a.id, a]));
+  const rows = [];
+  const walk = (parent, depth) => d.agents.filter(a => a.parent === parent).forEach(a => { rows.push([a, depth]); walk(a.id, depth + 1); });
+  walk("main", 0);
+  d.agents.forEach(a => { if (!rows.some(r => r[0] === a)) rows.push([a, 0]); });
+  return `<table><thead><tr><th>Agent</th><th>Status</th><th>Model</th><th class="num">Started</th><th class="num">Duration</th>
+    <th class="num">API calls</th><th class="num">Tool calls</th><th class="num">Peak context</th><th class="num">Output</th><th class="num">Est. cost</th><th class="num">Returned</th></tr></thead><tbody>
+    ${rows.map(([a, depth]) => { const s = a.summary; return `<tr class="row ${state.selected === a.id ? "sel" : ""}" data-id="${a.id}">
+      <td style="padding-left:${8 + depth * 18}px">${depth ? '<span class="muted">↳ </span>' : ""}<span class="dot" style="background:${typeColor(a.type)}"></span><b>${esc(a.type)}</b>
+        <div class="sec" style="font-size:12px;margin-left:${depth ? 30 : 15}px">${esc(a.description)}${a.background ? ' <span class="badge">background</span>' : ""}</div></td>
+      <td><span class="badge ${a.status}">${a.status}</span></td>
+      <td>${esc(s.models.map(shortModel).join(", ") || shortModel(a.requested_model) || "—")}</td>
+      <td class="num">${fmtTime(a.start_ts)}</td>
+      <td class="num">${fmtDur((a.status === "running" ? Date.now() : a.end_ts) - a.start_ts)}</td>
+      <td class="num">${s.calls}</td><td class="num">${s.tool_calls}</td>
+      <td class="num">${fmtN(s.peak_ctx)}</td><td class="num">${fmtN(s.output)}</td>
+      <td class="num">${fmt$(s.cost)}</td>
+      <td class="num">${a.returned_chars != null ? "~" + fmtN(a.returned_chars / 4) + " tok" : '<span class="muted">—</span>'}</td></tr>`; }).join("")}
+    </tbody></table>`;
+}
+
+function detail(d) {
+  const a = d.agents.find(x => x.id === state.selected);
+  if (!a) {
+    const ms = d.main.summary;
+    return `<h2>Main session (orchestrator)</h2><p class="sub">Select an agent above to see what it was asked and what it returned.</p>
+      <div class="detail"><div><div class="kv">
+        <div>First prompt</div><div>${esc((d.first_prompt || "").slice(0, 300))}</div>
+        <div>Spawns</div><div>${d.main.spawns.length}</div>
+        <div>Tokens</div><div>${fmtN(ms.input)} input · ${fmtN(ms.cache_write)} cache write · ${fmtN(ms.cache_read)} cache read · ${fmtN(ms.output)} output</div>
+        <div>Est. cost</div><div>${fmt$(ms.cost)}</div></div></div>
+        <div><div class="sec" style="font-size:12px;margin-bottom:6px">Tools the main session used</div>${chips(ms.tools)}</div></div>`;
+  }
+  const s = a.summary;
+  return `<h2><span class="dot" style="background:${typeColor(a.type)}"></span>${esc(a.type)}: ${esc(a.description)}</h2>
+    <p class="sub">agent ${esc(a.id)} · spawned by ${a.parent === "main" ? "main session" : "agent " + esc(a.parent)} · depth ${a.depth} · ${a.background ? "background" : "foreground (parent waited)"}</p>
+    <div class="detail">
+      <div>
+        <div class="kv">
+          <div>Status</div><div><span class="badge ${a.status}">${a.status}</span></div>
+          <div>Model</div><div>${esc(s.models.join(", ") || a.requested_model || "—")}</div>
+          <div>Spawned → started</div><div>${fmtTime(a.spawn_ts)} → ${fmtTime(a.start_ts)}</div>
+          <div>Last activity</div><div>${fmtTime(a.end_ts)}${a.returned_ts ? " · result delivered " + fmtTime(a.returned_ts) : ""}</div>
+          <div>Delegated prompt</div><div>${fmtN(a.prompt_chars)} chars (~${fmtN(a.prompt_chars / 4)} tokens)</div>
+          <div>Context</div><div>starts at ${fmtN(a.calls[0]?.ctx || 0)} · peak ${fmtN(s.peak_ctx)} tokens</div>
+          <div>Tokens</div><div>${fmtN(s.input)} input · ${fmtN(s.cache_write)} cache write · ${fmtN(s.cache_read)} cache read · ${fmtN(s.output)} output</div>
+          <div>Est. cost</div><div>${fmt$(s.cost)}${s.unpriced ? ` (${s.unpriced} calls on an unpriced model)` : ""}</div>
+          <div>Returned to parent</div><div>${a.returned_chars != null ? `~${fmtN(a.returned_chars / 4)} tokens — that's all the parent's context grew by` : "not yet"}</div>
+        </div>
+        <div class="sec" style="font-size:12px;margin:12px 0 6px">Tools used</div>${chips(s.tools)}
+      </div>
+      <div>
+        <div class="sec" style="font-size:12px">Prompt from the parent</div><pre>${esc(a.prompt || "—")}</pre>
+        <div class="sec" style="font-size:12px;margin-top:10px">Report handed back</div><pre>${esc(a.report || "—")}</pre>
+      </div>
+    </div>`;
+}
+const chips = tools => Object.keys(tools).length ? `<div class="chips">${Object.entries(tools).map(([k, v]) => `<span class="chip">${esc(k)} <b>${v}</b></span>`).join("")}</div>` : `<span class="muted">none</span>`;
+
+// ---------- charts ----------
+function svgEl(w, h) { return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img">`; }
+function timeTicks(t0, t1, n) {
+  const span = t1 - t0, steps = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200].map(s => s * 1000);
+  const step = steps.find(s => span / s <= n) || 14400000;
+  const out = []; for (let t = Math.ceil(t0 / step) * step; t <= t1; t += step) out.push(t); return out;
+}
+
+function drawGantt(d) {
+  const host = $("#gantt");
+  const W = Math.max(host.clientWidth, 720), L = 210, R = 16, rowH = 26, top = 24;
+  const agents = d.agents;
+  const t0 = d.start_ts, t1 = Math.max(d.end_ts, ...agents.filter(a => a.status === "running").map(() => Date.now()), t0 + 1000);
+  const x = t => L + (t - t0) / (t1 - t0) * (W - L - R);
+  const mainH = 46, H = top + mainH + agents.length * rowH + 10;
+  const rowY = i => top + mainH + i * rowH;
+  let s = svgEl(W, H);
+  for (const t of timeTicks(t0, t1, 8)) s += `<line class="grid" x1="${x(t)}" x2="${x(t)}" y1="${top - 6}" y2="${H - 6}"/><text x="${x(t)}" y="${top - 10}" text-anchor="middle">${fmtTime(t)}</text>`;
+  // main row
+  const maxOut = Math.max(1, ...d.main.calls.map(c => c.output));
+  s += `<text x="0" y="${top + 26}" style="fill:var(--text-primary);font-weight:600">Main session</text>`;
+  s += `<line x1="${L}" x2="${W - R}" y1="${top + 38}" y2="${top + 38}" stroke="var(--border)"/>`;
+  d.main.calls.forEach((c, i) => {
+    const h = 4 + Math.sqrt(c.output / maxOut) * 28;
+    s += `<rect class="hit" data-k="call" data-i="${i}" x="${x(c.ts) - 1}" y="${top + 38 - h}" width="2" height="${h}" fill="var(--main)"/>`;
+    s += `<rect class="hit" data-k="call" data-i="${i}" x="${x(c.ts) - 4}" y="${top + 2}" width="8" height="38" fill="transparent"/>`;
+  });
+  // agents
+  agents.forEach((a, i) => {
+    const y = rowY(i), c = typeColor(a.type), sp = d.main.spawns.find(sp => sp.ts === a.spawn_ts);
+    const end = a.status === "running" ? Date.now() : (a.end_ts || a.start_ts);
+    const bx = x(a.start_ts || a.spawn_ts), bw = Math.max(3, x(end) - bx);
+    const label = (a.depth > 1 ? "  ↳ " : "") + a.description;
+    s += `<text x="${(a.depth - 1) * 12}" y="${y + rowH / 2 + 4}">${esc(label.length > 30 ? label.slice(0, 29) + "…" : label)}</text>`;
+    // spawn link from the parent's row
+    const py = a.parent === "main" ? top + 38 : rowY(agents.findIndex(p => p.id === a.parent)) + rowH / 2;
+    const sx = x(a.spawn_ts || a.start_ts);
+    s += `<path d="M${sx},${py} C${sx},${(py + y + rowH / 2) / 2} ${bx},${(py + y + rowH / 2) / 2} ${bx},${y + rowH / 2}" fill="none" stroke="${c}" stroke-width="1" stroke-opacity=".45"/>`;
+    if (a.parent === "main") s += `<rect x="${sx - 4}" y="${top + 34}" width="8" height="8" transform="rotate(45 ${sx} ${top + 38})" fill="${c}" stroke="var(--surface-1)" stroke-width="2"/>`;
+    s += `<rect class="hit bar" data-k="agent" data-id="${a.id}" x="${bx}" y="${y + 6}" width="${bw}" height="${rowH - 12}" rx="4" fill="${c}" fill-opacity="${state.selected && state.selected !== a.id ? .35 : 1}" ${a.status === "running" ? 'stroke="var(--text-primary)" stroke-dasharray="3 2"' : ""} style="cursor:pointer"/>`;
+    if (a.returned_ts) s += `<circle cx="${x(a.returned_ts)}" cy="${y + rowH / 2}" r="4" fill="var(--surface-1)" stroke="${c}" stroke-width="2"/>`;
+    const lbl = `${fmt$(a.summary.cost)} · ${fmtN(a.summary.peak_ctx)} ctx`;
+    const lx = bx + bw + 6;
+    if (lx + 90 < W) s += `<text x="${lx}" y="${y + rowH / 2 + 4}" class="muted" style="fill:var(--text-muted)">${lbl}</text>`;
+  });
+  host.innerHTML = s + "</svg>";
+  host.querySelectorAll(".hit").forEach(el => {
+    el.addEventListener("mouseenter", e => {
+      if (el.dataset.k === "call") { const c = d.main.calls[+el.dataset.i];
+        showTip(e, `<b>Main session · API call</b><br>${fmtTime(c.ts)} · ${esc(shortModel(c.model))}<br>context ${fmtN(c.ctx)} · output ${fmtN(c.output)}<br>${c.tools.length ? "tools: " + esc(c.tools.join(", ")) : "no tool calls"}<br>${fmt$(c.cost)}`);
+      } else { const a = d.agents.find(a => a.id === el.dataset.id), s = a.summary;
+        showTip(e, `<b>${esc(a.type)}</b> — ${esc(a.description)}<br>${a.status} · ${fmtDur((a.status === "running" ? Date.now() : a.end_ts) - a.start_ts)}${a.background ? " · background" : ""}<br>${s.calls} API calls · ${s.tool_calls} tool calls<br>peak context ${fmtN(s.peak_ctx)} · output ${fmtN(s.output)}<br>est. ${fmt$(s.cost)}`); }
+    });
+    el.addEventListener("mouseleave", hideTip);
+    if (el.dataset.k === "agent") el.addEventListener("click", () => select(el.dataset.id));
+  });
+}
+
+function drawCtx(d) {
+  const host = $("#ctx");
+  const W = Math.max(host.clientWidth, 720), H = 220, L = 52, R = 16, T = 12, B = 26;
+  const a = d.agents.find(x => x.id === state.selected);
+  const series = [{ name: "Main session", color: "var(--main)", calls: d.main.calls }];
+  if (a) series.push({ name: a.description, color: typeColor(a.type), calls: a.calls });
+  const all = series.flatMap(s => s.calls);
+  if (!all.length) { host.innerHTML = `<div class="empty">No API calls yet.</div>`; return; }
+  const t0 = d.start_ts, t1 = Math.max(d.end_ts, t0 + 1000), maxY = Math.max(...all.map(c => c.ctx)) * 1.08 || 1;
+  const x = t => L + (t - t0) / (t1 - t0) * (W - L - R), y = v => T + (1 - v / maxY) * (H - T - B);
+  let s = svgEl(W, H);
+  for (let i = 0; i <= 4; i++) { const v = maxY * i / 4; s += `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${fmtN(v)}</text>`; }
+  for (const t of timeTicks(t0, t1, 8)) s += `<text x="${x(t)}" y="${H - 8}" text-anchor="middle">${fmtTime(t)}</text>`;
+  series.forEach(se => {
+    s += `<path d="${se.calls.map((c, i) => (i ? "L" : "M") + x(c.ts).toFixed(1) + "," + y(c.ctx).toFixed(1)).join("")}" fill="none" stroke="${se.color}" stroke-width="2" stroke-linejoin="round"/>`;
+    const last = se.calls[se.calls.length - 1];
+    if (last) s += `<circle cx="${x(last.ts)}" cy="${y(last.ctx)}" r="4" fill="${se.color}" stroke="var(--surface-1)" stroke-width="2"/>`;
+  });
+  s += `<line id="xh" class="grid" y1="${T}" y2="${H - B}" style="display:none;stroke:var(--text-muted)"/><rect id="ctxhit" x="${L}" y="${T}" width="${W - L - R}" height="${H - T - B}" fill="transparent"/>`;
+  host.innerHTML = (series.length > 1 ? `<div class="legend">${series.map(se => `<span><i style="background:${se.color}"></i>${esc(se.name)}</span>`).join("")}</div>` : "") + s + "</svg>";
+  const hit = $("#ctxhit", host), xh = $("#xh", host);
+  hit.addEventListener("mousemove", e => {
+    const r = hit.getBoundingClientRect(), tm = t0 + (e.clientX - r.left) / r.width * (t1 - t0);
+    const near = series.map(se => { let best = null; for (const c of se.calls) if (c.ts <= tm) best = c; return best && { se, c: best }; }).filter(Boolean);
+    if (!near.length) return hideTip();
+    xh.setAttribute("x1", x(tm)); xh.setAttribute("x2", x(tm)); xh.style.display = "";
+    showTip(e, `<b>${fmtTime(tm)}</b><br>` + near.map(({ se, c }) => `<i style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${se.color};margin-right:5px"></i>${esc(se.name.slice(0, 40))}: <b>${fmtN(c.ctx)}</b> tokens`).join("<br>"));
+  });
+  hit.addEventListener("mouseleave", () => { hideTip(); xh.style.display = "none"; });
+}
+
+// ---------- controls ----------
+$("#session").onchange = e => { state.key = e.target.value; state.follow = false; $("#follow").classList.remove("on");
+  try { localStorage.setItem("ccviz.key", state.key); } catch {} loadSession(); };
+$("#live").onclick = () => { state.live = !state.live; $("#live").classList.toggle("on", state.live); };
+$("#follow").onclick = async () => { state.follow = !state.follow; $("#follow").classList.toggle("on", state.follow);
+  if (state.follow) { try { localStorage.removeItem("ccviz.key"); } catch {} await loadSessions(); loadSession(); } };
+$("#follow").classList.toggle("on", state.follow);
+let resizeT; addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(() => state.data && render(), 150); });
+
+(async function tick() {
+  try {
+    if (!state.data || state.live) {
+      const prev = state.key;
+      await loadSessions();
+      if (state.key !== prev || state.live || !state.data) await loadSession();
+    }
+  } catch (e) { $("#updated").textContent = "Server not reachable"; }
+  setTimeout(tick, 3000);
+})();
+</script>
+</body>
+</html>

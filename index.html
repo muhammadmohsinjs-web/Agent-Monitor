@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Swarm</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0e0f12; --term: #16181d; --line: #3a3d46; --dim: #5d616c; --muted: #8b909b; --fg: #d6d8de; --hi: #f3f4f6;
+  --main: #e8956b; --ok: #8fd694; --run: #e6c07b; --bad: #e88080;
+  --c1: #9aa5e6; --c2: #8fd694; --c3: #e6a0c4; --c4: #7fc8d6; --c5: #e6c07b; --c6: #b39ae6; --c7: #e88080; --c8: #c8c27a;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); }
+body { color: var(--fg); font: 12px/1.6 "JetBrains Mono", "SF Mono", Menlo, ui-monospace, monospace; padding: 16px; }
+.win { max-width: 1120px; margin: 0 auto; background: var(--term); border: 1px solid #2a2d34; border-radius: 12px; overflow: hidden; box-shadow: 0 24px 70px rgba(0,0,0,.55); }
+.bar { display: flex; align-items: center; gap: 10px; padding: 7px 12px; border-bottom: 1px solid #23262c; color: var(--dim); font-size: 11px; }
+.dots i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
+.ttl { flex: 1; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+select { font: inherit; color: var(--muted); background: transparent; border: 1px dashed var(--line); border-radius: 4px; padding: 1px 4px; max-width: 300px; }
+select option { background: var(--term); }
+.body { padding: 26px 22px 14px; }
+
+.stage { position: relative; }
+#wires { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+#wires path { fill: none; stroke-width: 1.4; }
+#wires .flow { stroke-dasharray: 3 7; animation: flow .9s linear infinite; }
+@keyframes flow { to { stroke-dashoffset: -10; } }
+
+.node { position: relative; z-index: 1; background: var(--term); border: 1px dashed var(--line); padding: 10px 12px; cursor: pointer; transition: border-color .15s; }
+.node:hover { border-color: var(--muted); }
+.node.sel { border-style: solid; }
+.node::before, .node::after { content: "+"; position: absolute; color: var(--dim); font-size: 10px; line-height: 1; }
+.node::before { top: -6px; left: -4px; } .node::after { bottom: -6px; right: -4px; }
+
+.main { width: min(460px, 100%); margin: 0 auto; text-align: center; border-color: #6b4a3a; cursor: default; }
+.main .who { color: var(--main); font-weight: 600; font-size: 13px; }
+.main .brief { color: var(--muted); margin: 4px 0 6px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.state { letter-spacing: .04em; }
+.usage { display: grid; grid-template-columns: auto 1fr; gap: 1px 12px; text-align: left; margin: 8px auto 6px; width: fit-content; max-width: 100%; color: var(--muted); }
+.usage b { color: var(--hi); font-weight: 400; } .usage b.ok { color: var(--ok); }
+.meter { color: var(--main); letter-spacing: -.5px; white-space: pre; }
+
+.swarm { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 22px 16px; margin-top: 64px; }
+.agent .nm { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.agent .st { margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.agent .sm { color: var(--dim); }
+.agent.done { opacity: .8; } .agent.done:hover, .agent.sel { opacity: 1; }
+.agent.running { border-color: #6b5f3a; }
+.empty { text-align: center; color: var(--dim); margin-top: 56px; }
+
+.stats { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px 26px; margin: 30px 0 4px; color: var(--muted); }
+.stats b { color: var(--hi); font-weight: 600; }
+
+.detail { margin-top: 22px; border: 1px dashed var(--line); padding: 12px 14px; }
+.detail .h { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; color: var(--muted); margin-bottom: 8px; }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+@media (max-width: 760px) { .cols { grid-template-columns: 1fr; } }
+.cols p { margin: 2px 0 0; color: var(--fg); white-space: pre-wrap; word-break: break-word; max-height: 160px; overflow: auto; border-left: 1px solid var(--line); padding-left: 10px; }
+
+.feed { margin-top: 22px; border-top: 1px dashed var(--line); padding-top: 10px; }
+.feed .l { display: grid; grid-template-columns: 9ch 24ch 1fr auto; gap: 14px; white-space: nowrap; color: var(--muted); }
+.feed .l > * { overflow: hidden; text-overflow: ellipsis; }
+.feed .tk { text-align: right; color: var(--dim); } .feed .tk b { color: var(--muted); font-weight: 400; }
+.feed .l:last-child { color: var(--fg); }
+@media (max-width: 760px) { .feed .l { grid-template-columns: 9ch 12ch 1fr auto; } }
+
+.prompt { margin-top: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+.cur { display: inline-block; width: .6em; background: var(--ok); animation: blink 1s steps(1) infinite; }
+.pulse { animation: blink 1.2s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.dim { color: var(--dim); } .mut { color: var(--muted); } .ok { color: var(--ok); } .run { color: var(--run); } .bad { color: var(--bad); }
+.total { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px 18px; margin-bottom: 22px; padding: 12px 16px; border: 1px solid #6b4a3a; border-radius: 8px; background: linear-gradient(90deg, rgba(232,149,107,.14), rgba(232,149,107,.03)); box-shadow: inset 3px 0 0 var(--main); }
+.total .lbl { color: var(--main); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; font-size: 11px; }
+.total .amt { color: var(--ok); font-size: 22px; font-weight: 600; line-height: 1.2; }
+.total .split { color: var(--muted); }
+.total .split b { color: var(--hi); font-weight: 400; }
+.hint { text-align: center; color: var(--dim); font-size: 11px; margin-top: 10px; }
+.hint span { cursor: pointer; } .hint span:hover { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="win">
+  <div class="bar">
+    <span class="dots"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i></span>
+    <span class="ttl" id="ttl">claude — swarm</span>
+    <select id="session" aria-label="Session"></select>
+  </div>
+  <div class="body" id="app"><div class="empty">reading transcripts…</div></div>
+</div>
+
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const plain = s => String(s || "").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+const N = n => { n = n || 0; return n >= 1e6 ? (n / 1e6).toFixed(1) + "M" : n >= 1e4 ? Math.round(n / 1e3) + "k" : n >= 1e3 ? (n / 1e3).toFixed(1) + "k" : String(Math.round(n)); };
+const $$ = n => n == null ? "—" : n >= 100 ? "$" + n.toFixed(0) : n >= 1 ? "$" + n.toFixed(2) : "$" + n.toFixed(3);
+const dur = ms => { if (ms == null || ms < 0) return "—"; const s = Math.round(ms / 1000);
+  return s < 60 ? s + "s" : s < 3600 ? Math.floor(s / 60) + "m" + String(s % 60).padStart(2, "0") + "s" : Math.floor(s / 3600) + "h" + String(Math.floor(s % 3600 / 60)).padStart(2, "0") + "m"; };
+const hms = t => t ? new Date(t).toLocaleTimeString([], { hour12: false }) : "--:--:--";
+const ago = t => { const s = (Date.now() - t) / 1000; return s < 60 ? "now" : s < 3600 ? Math.round(s / 60) + "m" : s < 86400 ? Math.round(s / 3600) + "h" : Math.round(s / 86400) + "d"; };
+const model = m => { const s = (m || "").replace("claude-", "").replace(/-\d{8}$/, "").replace(/-(\d+)-(\d+)$/, " $1.$2").replace(/-(\d+)$/, " $1"); return s.charAt(0).toUpperCase() + s.slice(1); };
+
+const windowOf = m => /haiku-4-5|sonnet-4-5|opus-4-5|-3-/.test(m || "") ? 200000 : 1000000;
+const meter = (frac, w) => { const f = Math.round(Math.max(0, Math.min(1, frac || 0)) * w); return "█".repeat(f) + "░".repeat(w - f); };
+const S = { key: null, d: null, sel: null, live: true, follow: true };
+try { const k = new URLSearchParams(location.search).get("key") || localStorage.getItem("ccviz.key"); if (k) { S.key = k; S.follow = false; } } catch {}
+
+let slots = {};
+const color = type => { if (!(type in slots)) slots[type] = Object.keys(slots).length; const i = slots[type]; return i < 8 ? `var(--c${i + 1})` : "var(--muted)"; };
+// keep CSS animations continuous across the 3-second re-renders
+const phase = ms => `animation-delay:-${Date.now() % ms}ms`;
+
+async function loadSessions() {
+  const list = await (await fetch("/api/sessions")).json();
+  if (S.follow || !S.key || !list.some(s => s.key === S.key)) S.key = list[0]?.key;
+  const sel = $("#session");
+  const html = list.map(s => `<option value="${esc(s.key)}">${esc(s.title.slice(0, 40))} · ${s.agents} agents · ${ago(s.mtime)}</option>`).join("");
+  if (html !== sel.dataset.html && document.activeElement !== sel) { sel.innerHTML = html; sel.dataset.html = html; }
+  sel.value = S.key;
+}
+async function loadSession() {
+  if (!S.key) { $("#app").innerHTML = `<div class="empty">no sessions in ~/.claude/projects</div>`; return; }
+  const r = await fetch("/api/session?key=" + encodeURIComponent(S.key)); if (!r.ok) return;
+  const d = await r.json();
+  if (S.d?.id !== d.id) { slots = {}; S.sel = null; }
+  d.start_ts = d.start_ts || Date.now(); d.end_ts = d.end_ts || d.start_ts;
+  S.d = d; render();
+}
+
+function lastAction(calls) {
+  for (let i = calls.length - 1; i >= 0; i--) { const c = calls[i]; if (c.tools.length) return `${c.tools.at(-1)} ${c.briefs?.at(-1) || ""}`.trim(); }
+  return "thinking";
+}
+
+function render() {
+  const d = S.d, A = d.agents, ms = d.main.summary;
+  A.forEach(a => color(a.type));
+  const running = A.filter(a => a.status === "running");
+  const live = d.running || running.length > 0;
+  const now = Date.now();
+  const cwd = (d.cwd || "~").replace(/^\/Users\/[^/]+/, "~");
+  $("#ttl").textContent = `${cwd} — claude`;
+  const mainState = running.length ? `<span class="run pulse" style="${phase(1200)}">●</span> <span class="run">delegating to ${running.length} agent${running.length > 1 ? "s" : ""}</span>`
+    : live ? `<span class="ok pulse" style="${phase(1200)}">●</span> <span class="ok">working</span>` : `<span class="dim">○ idle</span>`;
+  const selA = A.find(a => a.id === S.sel);
+
+  const subCost = A.reduce((sum, a) => sum + (a.summary.cost || 0), 0);
+  $("#app").innerHTML = `
+  <div class="total">
+    <span class="lbl">Total cost · main + ${A.length} subagent${A.length === 1 ? "" : "s"}</span>
+    <span class="amt">${$$(d.total.cost)}</span>
+    <span class="split">main <b>${$$(ms.cost)}</b> · subagents <b>${$$(subCost)}</b></span>
+  </div>
+  <div class="stage" id="stage">
+    <svg id="wires"></svg>
+    <div class="node main" id="n-main">
+      <div class="who">${esc(model(ms.models.at(-1)) || "Main")} · orchestrator</div>
+      <div class="brief">${esc(plain(d.first_prompt) || d.title || "—")}</div>
+      <div class="usage">
+        <span>context</span><span><span class="meter">${meter(ms.final_ctx / windowOf(ms.models.at(-1)), 14)}</span> <b>${N(ms.final_ctx)}</b> / ${N(windowOf(ms.models.at(-1)))} <span class="dim">· peak ${N(ms.peak_ctx)}</span></span>
+        <span>usage</span><span><b>${N(ms.input + ms.cache_write + ms.cache_read)}</b> in · <b>${N(ms.output)}</b> out · <b>${ms.calls}</b> calls</span>
+        <span>cost</span><span><b class="ok">${$$(ms.cost)}</b> main · <b class="ok">${$$(d.total.cost)}</b> total</span>
+      </div>
+      <div class="state">${mainState}</div>
+    </div>
+    ${A.length ? `<div class="swarm">${A.map(agentNode).join("")}</div>`
+      : `<div class="empty">no subagents yet — the main agent is working alone</div>`}
+  </div>
+
+  <div class="stats">
+    <span><b>${A.length}</b> agents</span>
+    <span><b class="${running.length ? "run" : ""}">${running.length}</b> working</span>
+    <span><b>${dur((live ? now : d.end_ts) - d.start_ts)}</b> elapsed</span>
+    <span><b class="ok">${$$(d.total.cost)}</b> est. cost</span>
+  </div>
+
+  ${selA ? detail(selA) : ""}
+
+  <div class="feed">${feed(d)}</div>
+
+  <div class="prompt"><span class="ok">${esc(cwd)}</span> $ claude <span class="dim">"${esc(plain(d.first_prompt).slice(0, 80))}"</span><span class="cur" style="${phase(1000)}">&nbsp;</span></div>
+  <div class="hint"><span id="live">live: ${S.live ? "on" : "off"}</span> · <span id="follow">${S.follow ? "following latest session" : "pinned to this session"}</span> · click an agent to see its task</div>`;
+
+  document.querySelectorAll(".agent[data-id]").forEach(el => el.onclick = () => { S.sel = S.sel === el.dataset.id ? null : el.dataset.id; render(); });
+  $("#live").onclick = () => { S.live = !S.live; render(); };
+  $("#follow").onclick = async () => { S.follow = !S.follow; if (S.follow) { try { localStorage.removeItem("ccviz.key"); } catch {} await loadSessions(); await loadSession(); } else render(); };
+  requestAnimationFrame(drawWires);
+}
+
+function agentNode(a) {
+  const c = color(a.type);
+  const st = a.status === "running"
+    ? `<span class="run pulse" style="${phase(1200)}">▌</span> <span class="run">${esc(lastAction(a.calls))}</span>`
+    : a.status === "done" ? `<span class="ok">✓</span> <span class="mut">done in ${dur(a.end_ts - a.start_ts)}</span>`
+    : `<span class="bad">■</span> <span class="mut">stopped</span>`;
+  const t = a.status === "running" ? dur(Date.now() - a.start_ts) : $$(a.summary.cost);
+  const m = (a.summary.models.length ? a.summary.models : [a.requested_model]).filter(Boolean).map(model).join(" + ") || "—";
+  return `<div class="node agent ${a.status} ${S.sel === a.id ? "sel" : ""}" id="n-${a.id}" data-id="${a.id}" title="${esc(a.description)} · ${esc(a.type)}" style="${S.sel === a.id ? `border-color:${c}` : ""}">
+    <div class="nm" style="color:${c}">${esc(a.description)}</div>
+    <div class="st">${st}</div>
+    <div class="sm"><span style="color:${c};opacity:.75">${esc(m)}</span> · ${t}</div>
+  </div>`;
+}
+
+function detail(a) {
+  const c = color(a.type), s = a.summary;
+  return `<div class="detail" style="border-color:${c}">
+    <div class="h"><span style="color:${c}">${esc(a.description)}</span><span>${esc(a.type)} · ${esc((s.models.length ? s.models : [a.requested_model]).filter(Boolean).map(model).join(" + "))} · ${N(s.peak_ctx)} context · ${s.tool_calls} tool calls · ${$$(s.cost)}</span></div>
+    <div class="cols">
+      <div><span class="mut">→ task from ${a.parent === "main" ? "main" : "parent agent"}</span><p>${esc(plain(a.prompt).slice(0, 900) || "—")}</p></div>
+      <div><span class="mut">← ${a.status === "running" ? "still working…" : "result handed back"}</span><p>${esc((a.report || "").trim().slice(0, 900) || "—")}</p></div>
+    </div>
+  </div>`;
+}
+
+function feed(d) {
+  const ev = [];
+  // one row per API call, with the tokens that call used
+  const add = (calls, who, c) => calls.forEach(k => {
+    const what = k.tools.length ? k.tools.map((tool, i) => `${tool} ${k.briefs?.[i] || ""}`.trim()).join(" · ") : "reply";
+    ev.push([k.ts, who, c, what, `<b>${N(k.input + k.cache_write + k.cache_read)}</b> in · <b>${k.est_out ? "~" : ""}${N(k.output)}</b> out`]);
+  });
+  add(d.main.calls, "main", "var(--main)");
+  d.agents.forEach(a => {
+    const c = color(a.type);
+    if (a.start_ts) ev.push([a.start_ts, a.description, c, "▸ starts"]);
+    add(a.calls, a.description, c);
+    if (a.returned_ts) ev.push([a.returned_ts, a.description, c, "◂ hands result back to main"]);
+  });
+  ev.sort((x, y) => x[0] - y[0]);
+  return ev.slice(-8).map(([ts, who, c, what, tk]) => `<div class="l"><span class="dim">${hms(ts)}</span><span style="color:${c}">${esc(who)}</span><span title="${esc(what)}">${esc(what)}</span><span class="tk">${tk || ""}</span></div>`).join("")
+    || `<div class="l"><span class="dim">--:--:--</span><span></span><span class="dim">waiting for activity</span><span></span></div>`;
+}
+
+// Wires: main → each agent (or parent agent → nested agent). Running = flowing dashes.
+function drawWires() {
+  const stage = $("#stage"), svg = $("#wires"), main = $("#n-main"); if (!stage || !svg || !main) return;
+  const R = stage.getBoundingClientRect(), box = el => { const r = el.getBoundingClientRect(); return { x: r.left - R.left, y: r.top - R.top, w: r.width, h: r.height }; };
+  // Wires fan out from the parent to a rail above the first row, then drop straight down
+  // their column (behind the cards), so lower rows never cut across other cards.
+  const first = $(".swarm .agent"); const railY = first ? box(first).y - 22 : 0;
+  const order = [...S.d.agents].sort((x, y) => (x.status === "running" || S.sel === x.id) - (y.status === "running" || S.sel === y.id));
+  let out = "";
+  for (const a of order) {
+    const el = document.getElementById("n-" + a.id); if (!el) continue;
+    const nested = a.parent !== "main" && document.getElementById("n-" + a.parent);
+    const pb = box(nested || main), cb = box(el);
+    const x1 = pb.x + pb.w / 2, y1 = pb.y + pb.h, x2 = cb.x + cb.w / 2, y2 = cb.y;
+    const c = color(a.type), run = a.status === "running", sel = S.sel === a.id;
+    const op = run || sel ? 1 : S.sel ? .12 : .35;
+    const d = nested
+      ? `M${x1},${y1} C${x1},${y1 + 20} ${x2},${y2 - 20} ${x2},${y2}`
+      : `M${x1},${y1} C${x1},${railY} ${x2},${y1} ${x2},${railY} L${x2},${y2}`;
+    out += `<path d="${d}" stroke="${c}" stroke-opacity="${op}" ${run ? `class="flow" style="${phase(900)}"` : ""}/>`;
+    if (a.returned_ts) out += `<circle cx="${x2}" cy="${y2 - 4}" r="2.5" fill="${c}" fill-opacity="${Math.min(1, op + .2)}"/>`;
+  }
+  svg.innerHTML = out;
+}
+
+$("#session").onchange = e => { S.key = e.target.value; S.follow = false; try { localStorage.setItem("ccviz.key", S.key); } catch {} loadSession(); };
+addEventListener("keydown", e => { if (e.key === "Escape" && S.sel) { S.sel = null; render(); } });
+let rz; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(drawWires, 60); });
+
+(async function tick() {
+  try { if (!S.d || S.live) { await loadSessions(); await loadSession(); } }
+  catch { $("#ttl").textContent = "server not reachable — run python3 server.py"; }
+  setTimeout(tick, 3000);
+})();
+</script>
+</body>
+</html>

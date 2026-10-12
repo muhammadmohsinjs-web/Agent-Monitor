@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent View</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0e0f12; --term: #16181d; --line: #3a3d46; --dim: #5d616c; --muted: #8b909b; --fg: #d6d8de; --hi: #f3f4f6;
+  --main: #e8956b; --ok: #8fd694; --warn: #e6c07b; --bad: #e88080;
+  --c1: #9aa5e6; --c2: #e6c07b; --c3: #8fd694; --c4: #e6a0c4; --c5: #7fc8d6; --c6: #e88080; --c7: #b39ae6; --c8: #c8c27a;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); }
+body { color: var(--fg); font: 12px/1.6 "JetBrains Mono", "SF Mono", Menlo, ui-monospace, monospace; padding: 16px; }
+.win { max-width: 1240px; margin: 0 auto; background: var(--term); border: 1px solid #2a2d34; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+.bar { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-bottom: 1px solid #23262c; color: var(--dim); font-size: 11px; }
+.bar .dots i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
+.bar .ttl { flex: 1; text-align: center; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.bar select { font: inherit; color: var(--muted); background: transparent; border: 1px dashed var(--line); border-radius: 4px; padding: 1px 4px; max-width: 360px; }
+.bar select option { background: var(--term); }
+.body { padding: 14px 18px 10px; }
+.head { text-align: center; font-weight: 600; color: var(--hi); letter-spacing: .04em; }
+.legend { text-align: center; color: var(--muted); font-size: 11px; margin: 4px 0 12px; }
+.legend span { margin: 0 10px; white-space: nowrap; }
+.sq { display: inline-block; width: 8px; height: 8px; margin-right: 6px; vertical-align: 0; }
+.grid { display: grid; grid-template-columns: 290px 1fr; gap: 14px; }
+@media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+.col { display: grid; gap: 14px; align-content: start; min-width: 0; }
+.box { position: relative; border: 1px dashed var(--line); padding: 10px 12px; min-width: 0; }
+.box::before, .box::after { content: "+"; position: absolute; color: var(--dim); font-size: 10px; line-height: 1; }
+.box::before { top: -6px; left: -4px; } .box::after { bottom: -6px; right: -4px; }
+.box.hot { border-color: #6b4a3a; }
+.bh { display: flex; justify-content: space-between; gap: 10px; color: var(--muted); margin-bottom: 8px; white-space: nowrap; }
+.bh b { color: var(--main); font-weight: 400; }
+.k { color: var(--muted); margin-top: 10px; }
+.row { display: flex; justify-content: space-between; gap: 8px; white-space: nowrap; }
+.row > :first-child { overflow: hidden; text-overflow: ellipsis; }
+.tag { color: var(--main); }
+.dim { color: var(--dim); } .mut { color: var(--muted); } .hi { color: var(--hi); }
+.ok { color: var(--ok); } .warn { color: var(--warn); } .bad { color: var(--bad); }
+.clk { cursor: pointer; } .clk:hover { background: #1f2229; }
+.sel { background: #23262e; }
+.tl { white-space: pre; overflow: hidden; line-height: 1.75; }
+.tl .r { display: flex; } .tl .lbl { flex: none; overflow: hidden; text-overflow: ellipsis; } .tl .meta { flex: none; text-align: right; color: var(--muted); }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+.card { text-align: center; }
+.card .nm { font-weight: 600; } .card .ds { height: 3.2em; overflow: hidden; color: var(--fg); margin: 4px 0; }
+.meter { white-space: pre; letter-spacing: -.5px; }
+pre { margin: 4px 0 0; white-space: pre-wrap; word-break: break-word; max-height: 300px; overflow: auto; color: var(--fg); font: inherit; border-left: 1px solid var(--line); padding-left: 10px; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; } @media (max-width: 860px) { .two { grid-template-columns: 1fr; } }
+.motto { text-align: center; margin: 14px 0 8px; color: var(--hi); }
+.log { height: 220px; overflow: auto; }
+.log .l { display: grid; grid-template-columns: 9ch 16ch 1fr auto 10ch; gap: 12px; white-space: nowrap; }
+.log .l > * { overflow: hidden; text-overflow: ellipsis; } .log .l > :nth-child(4) { color: var(--muted); text-align: right; }
+@media (max-width: 860px) { .log .l { grid-template-columns: 9ch 12ch 1fr 9ch; } .log .l > :nth-child(4) { display: none; } }
+.prompt { margin-top: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prompt .cur { display: inline-block; width: .6em; background: var(--ok); animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.status { color: var(--dim); font-size: 11px; margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.status b { font-weight: 400; } .status .btn { cursor: pointer; }
+.pulse { animation: blink 1.2s steps(1) infinite; }
+#tip { position: fixed; pointer-events: none; z-index: 9; background: #0b0c0f; border: 1px dashed var(--line); padding: 6px 9px; display: none; max-width: 340px; white-space: pre-wrap; }
+#measure { position: absolute; visibility: hidden; white-space: pre; }
+</style>
+</head>
+<body>
+<div class="win">
+  <div class="bar">
+    <span class="dots"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i></span>
+    <span class="ttl" id="ttl">claude — agents</span>
+    <select id="session" aria-label="Session"></select>
+  </div>
+  <div class="body" id="app"><div class="mut" style="padding:40px;text-align:center">loading transcripts…</div></div>
+</div>
+<div id="tip"></div>
+<span id="measure">0000000000</span>
+
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const N = n => { n = n || 0; return n >= 1e6 ? (n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + "M" : n >= 1e3 ? (n / 1e3).toFixed(n >= 1e4 ? 0 : 1) + "k" : String(Math.round(n)); };
+const $$ = n => n == null ? "—" : n >= 100 ? "$" + n.toFixed(0) : n >= 1 ? "$" + n.toFixed(2) : "$" + n.toFixed(3);
+const dur = ms => { if (ms == null || ms < 0) return "—"; const s = Math.round(ms / 1000);
+  return s < 60 ? s + "s" : s < 3600 ? Math.floor(s / 60) + "m" + String(s % 60).padStart(2, "0") + "s" : Math.floor(s / 3600) + "h" + String(Math.floor(s % 3600 / 60)).padStart(2, "0") + "m"; };
+const hms = t => t ? new Date(t).toLocaleTimeString([], { hour12: false }) : "--:--:--";
+const ago = t => { const s = (Date.now() - t) / 1000; return s < 60 ? "now" : s < 3600 ? Math.round(s / 60) + "m ago" : s < 86400 ? Math.round(s / 3600) + "h ago" : Math.round(s / 86400) + "d ago"; };
+const model = m => (m || "").replace("claude-", "").replace(/-\d{8}$/, "").replace(/-(\d+)-(\d+)$/, " $1.$2").replace(/-(\d+)$/, " $1");
+const Model = m => { const s = model(m); return s.charAt(0).toUpperCase() + s.slice(1); };
+const windowOf = m => /haiku-4-5|sonnet-4-5|opus-4-5|3-/.test(m || "") ? 200000 : 1000000;
+const SPARK = "▁▂▃▄▅▆▇█";
+const meter = (frac, w) => { frac = Math.max(0, Math.min(1, frac || 0)); const f = Math.round(frac * w); return "█".repeat(f) + "░".repeat(w - f); };
+
+const plain = s => String(s || "").replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+const S = { sessions: [], key: null, d: null, sel: null, live: true, follow: true, logStick: true };
+try { const k = new URLSearchParams(location.search).get("key") || localStorage.getItem("ccviz.key"); if (k) { S.key = k; S.follow = false; } } catch {}
+
+let slots = {};
+const color = type => { if (type === "main") return "var(--main)"; if (!(type in slots)) slots[type] = Object.keys(slots).length; const i = slots[type]; return i < 8 ? `var(--c${i + 1})` : "var(--muted)"; };
+const charW = () => $("#measure").getBoundingClientRect().width / 10 || 7.2;
+
+// ---------- data ----------
+async function loadSessions() {
+  S.sessions = await (await fetch("/api/sessions")).json();
+  if (S.follow || !S.key || !S.sessions.some(s => s.key === S.key)) S.key = S.sessions[0]?.key;
+  const sel = $("#session");
+  const html = S.sessions.map(s => `<option value="${esc(s.key)}">${esc(s.title.slice(0, 48))} · ${s.agents}a · ${ago(s.mtime)}</option>`).join("");
+  if (html !== sel.dataset.html && document.activeElement !== sel) { sel.innerHTML = html; sel.dataset.html = html; }
+  sel.value = S.key;
+}
+async function loadSession() {
+  if (!S.key) { $("#app").innerHTML = `<div class="mut" style="padding:40px;text-align:center">no sessions in ~/.claude/projects</div>`; return; }
+  const r = await fetch("/api/session?key=" + encodeURIComponent(S.key)); if (!r.ok) return;
+  const d = await r.json();
+  if (S.d?.id !== d.id) { slots = {}; S.sel = null; S.logStick = true; }
+  d.start_ts = d.start_ts || Date.now(); d.end_ts = d.end_ts || d.start_ts;
+  S.d = d; render();
+}
+
+// ---------- render ----------
+function render() {
+  const d = S.d, ms = d.main.summary, A = d.agents, t = d.total;
+  A.forEach(a => color(a.type));
+  const running = A.filter(a => a.status === "running");
+  const mainModel = ms.models[ms.models.length - 1];
+  const cwd = (d.cwd || "").replace(/^\/Users\/[^/]+/, "~");
+  const sub = A.reduce((s, a) => s + a.summary.cost, 0);
+  const types = Object.keys(slots);
+  const live = d.running || running.length > 0;
+  const now = Date.now();
+  const end = live ? now : d.end_ts;
+  $("#ttl").textContent = `${cwd || "~"} — claude — ${A.length} subagents`;
+
+  const keep = { log: $(".log")?.scrollTop, pres: [...document.querySelectorAll("pre")].map(p => p.scrollTop), y: window.scrollY };
+  const selA = A.find(a => a.id === S.sel);
+
+  $("#app").innerHTML = `
+  <div class="head">CLAUDE CODE AGENT VIEW · <span style="color:var(--main)">${esc(Model(mainModel).toUpperCase() || "MAIN")} MAIN</span>
+    · <span style="color:var(--c1)">${A.length} SUBAGENT${A.length === 1 ? "" : "S"}</span> · <span class="ok">${$$(t.cost)} EST</span></div>
+  <div class="legend"><span><i class="sq" style="background:var(--main)"></i>${esc(model(mainModel))} · main</span>${types.map(tp =>
+    `<span><i class="sq" style="background:${color(tp)}"></i>${esc(tp)} · ${A.filter(a => a.type === tp).length}</span>`).join("")}</div>
+
+  <div class="grid">
+    <div class="col">
+      <div class="box">
+        <div style="text-align:center"><span style="color:var(--main);font-weight:600">${esc(Model(mainModel))}</span> · <span class="hi">main</span><br>
+          <span class="mut">claude --effort ${esc(d.effort || "default")}</span></div>
+        <div class="k">the brief:</div>
+        <div class="mut" style="max-height:7.8em;overflow:hidden">${esc(plain(d.first_prompt).slice(0, 320) || "—")}</div>
+        <div class="k">delegations:</div>
+        ${A.length ? A.map((a, i) => `<div class="row clk ${S.sel === a.id ? "sel" : ""}" data-id="${a.id}">
+          <span><span class="dim">${String(i + 1).padStart(2, "0")}</span> ${a.depth > 1 ? "↳ " : ""}<span style="color:${color(a.type)}">${esc(a.description)}</span></span>
+          <span class="${a.status === "running" ? "warn pulse" : a.status === "done" ? "ok" : "bad"}">${a.status === "running" ? "run…" : a.status === "done" ? "✓" : "■"}</span></div>`).join("")
+          : `<div class="dim">· none yet</div>`}
+        <div class="k">tools · main:</div>
+        ${Object.entries(ms.tools).slice(0, 6).map(([k, v]) => `<div class="row"><span>· ${esc(k)}</span><span class="mut">${v}</span></div>`).join("") || `<div class="dim">· none</div>`}
+        <div class="k">counters:</div>
+        ${[["api calls", t.calls, ""], ["tool calls", t.tool_calls, ""], ["agents running", `${running.length} / ${A.length}`, running.length ? "warn" : ""],
+           ["tokens read", N(t.input + t.cache_read + t.cache_write), ""], ["tokens written", N(t.output), ""],
+           ["main context", `${N(ms.final_ctx)} / ${N(windowOf(mainModel))}`, ""], ["delegated cost", t.cost ? Math.round(sub / t.cost * 100) + "%" : "—", ""],
+           ["est. cost", $$(t.cost), "ok"]]
+          .map(([k, v, c]) => `<div class="row"><span>${k}</span><span class="${c || "hi"}">${v}</span></div>`).join("")}
+        <div class="tag" style="margin-top:10px">${live ? `<span class="pulse">[${running.length ? "DELEGATING" : "WORKING"}]</span>` : "[IDLE]"}</div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="box ${live ? "hot" : ""}">
+        <div class="bh"><span><b>timeline</b> · ${A.length} agents · ${dur(end - d.start_ts)}</span><span>${hms(d.start_ts)} → ${live ? "now" : hms(d.end_ts)}</span></div>
+        <div class="tl" id="tl"></div>
+        <div class="dim" style="margin-top:6px">◆ spawn  █ working  ● result returned to parent  ▁▅█ main output per slice</div>
+      </div>
+
+      <div class="box">
+        <div class="bh"><span><b>context</b> · tokens sent per call</span><span>${selA ? "main + selected" : "main"}</span></div>
+        <div id="ctx" class="tl"></div>
+      </div>
+
+      ${A.length ? `<div class="cards">${A.map(a => card(a)).join("")}</div>` : ""}
+
+      ${selA ? detail(selA) : ""}
+    </div>
+  </div>
+
+  <div class="motto">${motto(d, A, running)}</div>
+
+  <div class="box">
+    <div class="bh" style="margin-bottom:4px"><span><b>session log</b>${selA ? ` · <span style="color:${color(selA.type)}">@${esc(selA.type)}</span> <span class="clk dim" id="clr">[esc: all]</span>` : " · all agents"}</span><span>${S.logStick ? "following" : "paused · scroll to bottom to follow"}</span></div>
+    <div class="log" id="log">${logLines(d, selA)}</div>
+  </div>
+
+  <div class="prompt"><span class="ok">${esc(cwd || "~")}</span> <span class="dim">$</span> claude --model ${esc(model(mainModel))} --effort ${esc(d.effort || "default")} <span class="mut">"${esc(plain(d.first_prompt).slice(0, 90))}"</span><span class="cur">&nbsp;</span></div>
+  <div class="status">
+    <span>model: [<b style="color:var(--main)">${esc(model(mainModel))}</b>]</span>
+    <span>agents: [<b class="warn">${running.length}</b>/<b>${A.length}</b>]</span>
+    <span>ctx: [<b>${N(ms.final_ctx)}</b>]</span>
+    <span>cost: [<b class="ok">${$$(t.cost)}</b>]</span>
+    <span class="btn" id="live">live: [<b class="${S.live ? "ok" : "bad"}">${S.live ? "on" : "off"}</b>]</span>
+    <span class="btn" id="follow">follow: [<b class="${S.follow ? "ok" : "dim"}">${S.follow ? "latest" : "pinned"}</b>]</span>
+    <span>keys: [j/k] select · [esc] clear · [l] live · [f] follow</span>
+  </div>`;
+
+  drawTimeline(d, end);
+  drawCtx(d, selA, end);
+  bind();
+  const log = $("#log");
+  log.scrollTop = S.logStick ? log.scrollHeight : keep.log ?? 0;
+  document.querySelectorAll("pre").forEach((p, i) => p.scrollTop = keep.pres[i] || 0);
+  window.scrollTo(0, keep.y);
+}
+
+function motto(d, A, running) {
+  if (!A.length) return `Main session working <span class="mut">solo</span>. No delegation yet.`;
+  const ret = A.reduce((s, a) => s + (a.returned_chars || 0) / 4, 0);
+  const used = A.reduce((s, a) => s + a.summary.peak_ctx, 0);
+  return `Delegated <span style="color:var(--c1)">${A.length}</span> task${A.length > 1 ? "s" : ""}. Agents read <span class="warn">${N(used)}</span> tokens of context. Main got back <span class="ok">~${N(ret)}</span>.`;
+}
+
+function card(a) {
+  const s = a.summary, c = color(a.type), win = windowOf(s.models[0] || a.requested_model);
+  const st = a.status === "running" ? `<span class="warn pulse">[working · ${esc(lastTool(a))}]</span>` : a.status === "done" ? `<span class="ok">[done · ${dur(a.end_ts - a.start_ts)}]</span>` : `<span class="bad">[stopped]</span>`;
+  return `<div class="box card clk ${S.sel === a.id ? "sel" : ""}" data-id="${a.id}">
+    <div class="nm" style="color:${c}">@${esc(a.type)}</div>
+    <div class="mut">${esc(Model(s.models[0] || a.requested_model) || "—")} · ${esc(a.effort || "—")}${a.background ? " · bg" : ""}</div>
+    <div class="ds">${esc(a.description)}</div>
+    <div>${st}</div>
+    <div class="meter" style="color:${c}" title="peak context / window">${meter(s.peak_ctx / win, 16)}</div>
+    <div class="mut">${N(s.peak_ctx)} ctx · ${s.tool_calls} tools · ${$$(s.cost)}</div>
+  </div>`;
+}
+const lastTool = a => { for (let i = a.calls.length - 1; i >= 0; i--) if (a.calls[i].tools.length) return a.calls[i].tools.at(-1); return "thinking"; };
+
+function detail(a) {
+  const s = a.summary, c = color(a.type);
+  return `<div class="box" style="border-color:${c}">
+    <div class="bh"><span><span style="color:${c}">@${esc(a.type)}</span> · ${esc(a.description)}</span><span>${esc(a.id.slice(0, 10))} · ${a.parent === "main" ? "from main" : "from @" + esc(a.parent.slice(0, 8))}</span></div>
+    <div class="two">
+      <div>
+        ${[["model", s.models.join(", ") || a.requested_model || "—"], ["mode", a.background ? "background" : "foreground · parent waited"],
+           ["spawned", hms(a.spawn_ts)], ["finished", a.status === "running" ? "running…" : hms(a.end_ts)], ["delivered", a.returned_ts ? hms(a.returned_ts) : "—"],
+           ["prompt in", "~" + N(a.prompt_chars / 4) + " tok"], ["ctx start → peak", `${N(a.calls[0]?.ctx)} → ${N(s.peak_ctx)}`],
+           ["read / cached", `${N(s.input + s.cache_write)} / ${N(s.cache_read)}`], ["written", N(s.output)],
+           ["returned", a.returned_chars != null ? "~" + N(a.returned_chars / 4) + " tok" : "—"], ["est. cost", $$(s.cost)]]
+          .map(([k, v]) => `<div class="row"><span class="mut">${k}</span><span class="hi">${esc(v)}</span></div>`).join("")}
+        <div class="k">tools:</div>
+        <div>${Object.entries(s.tools).map(([k, v]) => `${esc(k)} <span class="mut">${v}</span>`).join(" · ") || '<span class="dim">none</span>'}</div>
+      </div>
+      <div>
+        <div class="mut">→ prompt from parent</div><pre>${esc(a.prompt || "—")}</pre>
+        <div class="mut" style="margin-top:10px">← report handed back</div><pre>${esc(a.report || "—")}</pre>
+      </div>
+    </div>
+  </div>`;
+}
+
+function logLines(d, selA) {
+  const ev = [];
+  const push = (ts, who, c, what, metric, tag, tc) => ev.push({ ts, who, c, what, metric, tag, tc });
+  const addCalls = (calls, who, c) => calls.forEach(k => {
+    if (k.tools.length) k.tools.forEach((tool, i) => push(k.ts, who, c, `${tool.padEnd(9)} ${k.briefs[i] || ""}`, `ctx ${N(k.ctx)}`, tool === "Agent" || tool === "Task" ? "[spawn]" : "[tool]", tool === "Agent" || tool === "Task" ? "tag" : "dim"));
+    else push(k.ts, who, c, `reply · ${N(k.output)} tokens written`, `ctx ${N(k.ctx)}`, "[text]", "mut");
+  });
+  if (!selA) addCalls(d.main.calls, "main", "var(--main)");
+  for (const a of d.agents) {
+    if (selA && a !== selA) continue;
+    const c = color(a.type), who = "@" + a.type;
+    push(a.start_ts, who, c, `starts · ${a.description}`, `${N(a.prompt_chars / 4)} in`, "[start]", "warn");
+    addCalls(a.calls, who, c);
+    if (a.returned_ts) push(a.returned_ts, who, c, `returns ~${N(a.returned_chars / 4)} tokens to ${a.parent === "main" ? "main" : "parent"}`, $$(a.summary.cost), "[done]", "ok");
+  }
+  ev.sort((x, y) => (x.ts || 0) - (y.ts || 0));
+  return ev.slice(-400).map((e, i, arr) => `<div class="l"><span class="dim">${i === arr.length - 1 ? "›" : " "}${hms(e.ts)}</span><span style="color:${e.c}">${esc(e.who)}</span><span>${esc(e.what)}</span><span>${esc(e.metric)}</span><span class="${e.tc}">${e.tag}</span></div>`).join("")
+    || `<div class="dim">no events yet</div>`;
+}
+
+// ---------- character charts ----------
+function cols(el, reserve) { return Math.max(20, Math.floor((el.clientWidth) / charW()) - reserve); }
+
+function drawTimeline(d, end) {
+  const el = $("#tl"), LW = 22, MW = 16, W = cols(el, LW + MW + 2);
+  const t0 = d.start_ts, span = Math.max(1000, end - t0), col = t => Math.max(0, Math.min(W - 1, Math.floor((t - t0) / span * W)));
+  // main row: output volume per column, spawn diamonds on top
+  const buckets = new Array(W).fill(0);
+  d.main.calls.forEach(c => buckets[col(c.ts)] += c.output);
+  const mx = Math.max(1, ...buckets);
+  const mainCells = buckets.map(v => v ? `<span style="color:var(--main)">${SPARK[Math.min(7, Math.floor(Math.sqrt(v / mx) * 8))]}</span>` : `<span class="dim">·</span>`);
+  d.agents.filter(a => a.parent === "main").forEach(a => { const i = col(a.spawn_ts || a.start_ts); mainCells[i] = `<span style="color:${color(a.type)}">◆</span>`; });
+  let out = `<div class="r"><span class="lbl hi" style="width:${LW}ch">main</span><span> ${mainCells.join("")} </span><span class="meta" style="width:${MW}ch">${d.main.summary.calls} calls ${$$(d.main.summary.cost)}</span></div>`;
+  for (const a of d.agents) {
+    const c = color(a.type), s0 = col(a.spawn_ts || a.start_ts), b0 = col(a.start_ts || a.spawn_ts);
+    const e0 = col(a.status === "running" ? end : (a.end_ts || a.start_ts)), r0 = a.returned_ts ? col(a.returned_ts) : -1;
+    let cells = "";
+    for (let i = 0; i < W; i++) {
+      if (i === r0 && i > e0) cells += `<span style="color:${c}">●</span>`;
+      else if (i >= b0 && i <= e0) cells += `<span style="color:${c}">${i === e0 && a.status === "running" ? '<span class="pulse">▌</span>' : i === e0 && r0 === e0 ? "●" : "█"}</span>`;
+      else if (i === s0) cells += `<span style="color:${c}">◆</span>`;
+      else if (i > s0 && i < b0) cells += `<span style="color:${c}">─</span>`;
+      else if (i > e0 && i < r0) cells += `<span class="dim">─</span>`;
+      else cells += `<span class="dim">${i % 10 === 0 ? "·" : " "}</span>`;
+    }
+    const label = (a.depth > 1 ? " ↳" : "") + "@" + a.description;
+    out += `<div class="r clk ${S.sel === a.id ? "sel" : ""}" data-id="${a.id}" data-tip="${esc(`@${a.type} · ${a.description}\n${a.status} · ${dur((a.status === "running" ? end : a.end_ts) - a.start_ts)}${a.background ? " · background" : ""}\n${a.summary.calls} api calls · ${a.summary.tool_calls} tool calls\npeak ctx ${N(a.summary.peak_ctx)} · out ${N(a.summary.output)}\nest. ${$$(a.summary.cost)}`)}">
+      <span class="lbl" style="width:${LW}ch;color:${c}">${esc(label)}</span><span> ${cells} </span><span class="meta" style="width:${MW}ch">${dur((a.status === "running" ? end : a.end_ts) - a.start_ts).padStart(6)} ${$$(a.summary.cost).padStart(6)}</span></div>`;
+  }
+  const ticks = [];
+  for (let i = 0; i < W; i += Math.max(10, Math.floor(W / 6))) ticks.push([i, hms(t0 + i / W * span).slice(0, 5)]);
+  let axis = " ".repeat(W + 2).split(""); ticks.forEach(([i, s]) => { for (let j = 0; j < s.length && i + 1 + j < axis.length; j++) axis[i + 1 + j] = s[j]; });
+  out += `<div class="r dim"><span style="width:${LW}ch"></span><span>${axis.join("")}</span></div>`;
+  el.innerHTML = out;
+}
+
+function drawCtx(d, a, end) {
+  const el = $("#ctx"), LW = 22, MW = 16, W = cols(el, LW + MW + 2), t0 = d.start_ts, span = Math.max(1000, end - t0);
+  const series = [["main", "var(--main)", d.main.calls, d.main.summary]];
+  if (a) series.push(["@" + a.description, color(a.type), a.calls, a.summary]);
+  const peak = Math.max(1, ...series.map(s => s[3].peak_ctx));
+  let out = "";
+  for (const [name, c, calls, s] of series) {
+    const b = new Array(W).fill(null);
+    calls.forEach(k => { const i = Math.min(W - 1, Math.floor((k.ts - t0) / span * W)); b[i] = Math.max(b[i] || 0, k.ctx); });
+    let last = null;
+    const cells = b.map((v, i) => { if (v != null) last = v; const lit = v != null;
+      if (last == null || (i * span / W + t0 > (calls.at(-1)?.ts || 0) && v == null)) return `<span class="dim">${i % 10 === 0 ? "·" : " "}</span>`;
+      return `<span style="color:${c};opacity:${lit ? 1 : .35}">${SPARK[Math.min(7, Math.floor(last / peak * 7.99))]}</span>`; }).join("");
+    out += `<div class="r"><span class="lbl" style="width:${LW}ch;color:${c}">${esc(name)}</span><span> ${cells} </span><span class="meta" style="width:${MW}ch">${N(s.final_ctx)} · pk ${N(s.peak_ctx)}</span></div>`;
+  }
+  const win = windowOf(d.main.summary.models.at(-1));
+  out += `<div class="r" style="margin-top:4px"><span class="lbl mut" style="width:${LW}ch">window used</span><span style="color:var(--main)"> ${meter(d.main.summary.final_ctx / win, Math.min(W, 40))}</span><span class="mut">&nbsp;${N(d.main.summary.final_ctx)} / ${N(win)}</span></div>`;
+  el.innerHTML = out;
+}
+
+// ---------- interaction ----------
+const tip = $("#tip");
+function bind() {
+  document.querySelectorAll("[data-id]").forEach(el => el.onclick = () => select(el.dataset.id, true));
+  document.querySelectorAll("[data-tip]").forEach(el => {
+    el.onmouseenter = e => { tip.textContent = el.dataset.tip; tip.style.display = "block"; };
+    el.onmousemove = e => { tip.style.left = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 8) + "px"; tip.style.top = e.clientY + 16 + "px"; };
+    el.onmouseleave = () => tip.style.display = "none";
+  });
+  $("#live").onclick = toggleLive; $("#follow").onclick = toggleFollow;
+  const clr = $("#clr"); if (clr) clr.onclick = () => select(null);
+  const log = $("#log"); log.onscroll = () => { const stick = log.scrollTop + log.clientHeight >= log.scrollHeight - 4; if (stick !== S.logStick) { S.logStick = stick; } };
+}
+function select(id, toggle) { S.sel = id && !(toggle && S.sel === id) ? id : null; S.logStick = true; tip.style.display = "none"; render(); }
+function toggleLive() { S.live = !S.live; render(); }
+async function toggleFollow() { S.follow = !S.follow; if (S.follow) { try { localStorage.removeItem("ccviz.key"); } catch {} await loadSessions(); await loadSession(); } else render(); }
+$("#session").onchange = e => { S.key = e.target.value; S.follow = false; try { localStorage.setItem("ccviz.key", S.key); } catch {} loadSession(); };
+addEventListener("keydown", e => {
+  if (e.target.tagName === "SELECT" || !S.d) return;
+  const ids = S.d.agents.map(a => a.id), i = ids.indexOf(S.sel);
+  if (e.key === "j") select(ids[Math.min(ids.length - 1, i + 1)]);
+  else if (e.key === "k") select(ids[Math.max(0, i < 0 ? 0 : i - 1)]);
+  else if (e.key === "Escape") select(null);
+  else if (e.key === "l") toggleLive();
+  else if (e.key === "f") toggleFollow();
+});
+let rz; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => S.d && render(), 120); });
+
+(async function tick() {
+  try { if (!S.d || S.live) { await loadSessions(); await loadSession(); } }
+  catch { const t = $("#ttl"); if (t) t.textContent = "server not reachable — run python3 server.py"; }
+  setTimeout(tick, 3000);
+})();
+</script>
+</body>
+</html>
